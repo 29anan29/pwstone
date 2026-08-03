@@ -40,8 +40,13 @@ pw del github.com -u alice      # 删除
 pw export -o backup.txt         # 导出明文备份
 pw passwd                       # 修改主密码（全量重加密）
 pw destroy                      # 自毁（输入 DESTROY 确认）
-pw about                        # 版本与加密信息
+pw update                      # 检查并更新（显示更新内容，确认 y 后下载替换）
+pw update check                # 仅检查版本，不更新
+pw update --proxy socks5://127.0.0.1:1080   # 走代理更新
+pw about                       # 版本与加密信息
 ```
+
+更新采用 apt 风格：先展示当前/新版本与更新内容，输入 `y` 确认后下载、SHA256 校验并备份替换自身。国内网络可用 `--proxy socks5://...` 或 `http://...` 代理加速。
 
 非 TTY 场景（管道）下密码从 stdin 逐行读取，例如：
 

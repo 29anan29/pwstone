@@ -16,7 +16,7 @@ const (
 	LockDuration = 30 * time.Second
 )
 
-var Version = "1.0.0"
+var Version = "1.2.0"
 
 func AppDir() string {
 	var base string

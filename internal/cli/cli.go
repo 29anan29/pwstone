@@ -17,6 +17,7 @@ import (
 	"pwstore/internal/model"
 	"pwstore/internal/store"
 	"pwstore/internal/tui"
+	"pwstore/internal/updater"
 )
 
 type CLI struct {
@@ -54,6 +55,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return c.dispatch(c.cmdPasswd(args[1:]))
 	case "destroy":
 		return c.dispatch(c.cmdDestroy(args[1:]))
+	case "update":
+		return c.dispatch(c.cmdUpdate(args[1:]))
 	case "version", "-v", "--version":
 		fmt.Fprintf(c.out, "pw %s\n", config.Version)
 		return 0
@@ -362,6 +365,87 @@ func (c *CLI) cmdDestroy(args []string) error {
 	return nil
 }
 
+func (c *CLI) cmdUpdate(args []string) error {
+	pos, flags, err := parseArgs(args)
+	if err != nil {
+		return err
+	}
+	proxy := flags["proxy"]
+	checkOnly := len(pos) > 0 && pos[0] == "check"
+
+	fmt.Fprintln(c.out, "正在检查更新…")
+	rel, err := updater.Latest(proxy)
+	if err != nil {
+		return err
+	}
+	cur := config.Version
+	if !updater.IsNewer(cur, rel.Tag) {
+		fmt.Fprintf(c.out, "已是最新版本 v%s\n", rel.Tag)
+		return nil
+	}
+
+	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintf(c.out, "  当前版本: v%s\n", cur)
+	fmt.Fprintf(c.out, "  新版本:   %s\n", rel.Tag)
+	if rel.Name != "" {
+		fmt.Fprintf(c.out, "  名称:     %s\n", rel.Name)
+	}
+	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(c.out, "更新内容:")
+	notes := strings.TrimSpace(rel.Notes)
+	if notes == "" {
+		notes = "（无发布说明）"
+	}
+	for _, line := range strings.Split(notes, "\n") {
+		fmt.Fprintln(c.out, "  "+line)
+	}
+	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	if checkOnly {
+		return nil
+	}
+
+	answer, err := c.readLine("确认更新? [y/N]: ")
+	if err != nil {
+		return err
+	}
+	if strings.ToLower(answer) != "y" && strings.ToLower(answer) != "yes" {
+		fmt.Fprintln(c.out, "已取消更新")
+		return nil
+	}
+
+	asset := updater.AssetNameFor(rel.Tag)
+	fmt.Fprintf(c.out, "正在下载 %s …\n", asset)
+	tmp, err := updater.Download(proxy, rel.Tag, asset)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(filepath.Dir(tmp))
+	fmt.Fprintln(c.out, "校验通过，正在替换…")
+	if err := updater.Replace(tmp); err != nil {
+		return fmt.Errorf("替换失败: %w", err)
+	}
+	fmt.Fprintln(c.out, "更新完成，请重新运行 pw")
+	return nil
+}
+
+func (c *CLI) readLine(prompt string) (string, error) {
+	fmt.Fprint(c.out, prompt)
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		sc := bufio.NewScanner(os.Stdin)
+		if !sc.Scan() {
+			return "", errors.New("无法读取输入")
+		}
+		return strings.TrimSpace(sc.Text()), nil
+	}
+	if c.scan == nil {
+		c.scan = bufio.NewScanner(c.in)
+	}
+	if !c.scan.Scan() {
+		return "", errors.New("无法读取输入")
+	}
+	return strings.TrimSpace(c.scan.Text()), nil
+}
+
 func (c *CLI) cmdAbout(args []string) error {
 	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintln(c.out, "  pw 密码管理器 v"+config.Version)
@@ -413,6 +497,7 @@ func (c *CLI) printHelp() {
     export [-o 文件]        导出明文备份
     passwd                 修改主密码
     destroy                自毁（删除所有数据）
+    update [check] [--proxy socks5://127.0.0.1:1080]  检查并更新
     about                  查看版本与加密信息
     version                显示版本
     help                   显示帮助
@@ -439,6 +524,7 @@ func parseArgs(args []string) (positional []string, flags map[string]string, err
 		"u": "user", "user": "user",
 		"n": "note", "note": "note",
 		"o": "output", "output": "output",
+		"x": "proxy", "proxy": "proxy",
 	}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
