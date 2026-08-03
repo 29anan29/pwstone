@@ -16,6 +16,8 @@ const (
 	LockDuration = 30 * time.Second
 )
 
+var Version = "1.0.0"
+
 func AppDir() string {
 	var base string
 	switch runtime.GOOS {

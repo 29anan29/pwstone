@@ -19,8 +19,6 @@ import (
 	"pwstore/internal/tui"
 )
 
-const Version = "1.0.0"
-
 type CLI struct {
 	in   io.Reader
 	out  io.Writer
@@ -57,8 +55,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "destroy":
 		return c.dispatch(c.cmdDestroy(args[1:]))
 	case "version", "-v", "--version":
-		fmt.Fprintf(c.out, "pwstore %s\n", Version)
+		fmt.Fprintf(c.out, "pwstore %s\n", config.Version)
 		return 0
+	case "about":
+		return c.dispatch(c.cmdAbout(args[1:]))
 	case "help", "-h", "--help":
 		c.printHelp()
 		return 0
@@ -362,6 +362,22 @@ func (c *CLI) cmdDestroy(args []string) error {
 	return nil
 }
 
+func (c *CLI) cmdAbout(args []string) error {
+	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(c.out, "  pwstore 密码管理器 v"+config.Version)
+	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(c.out, "  加密引擎: Argon2id (64 MiB, iter=3, 4 线程) + AES-256-GCM")
+	fmt.Fprintln(c.out, "  数据存储: "+config.AppDir())
+	fmt.Fprintln(c.out, "  保险库文件: "+config.VaultFile)
+	fmt.Fprintln(c.out, "  备份文件:   "+config.BackupFile)
+	fmt.Fprintln(c.out, "  暴力破解防护: 连续输错 5 次锁定 30 秒（持久化）")
+	fmt.Fprintln(c.out, "  官网/仓库: https://github.com/29anan29/pwstone")
+	fmt.Fprintln(c.out, "  协议/说明: 详见仓库 README.md")
+	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Fprintln(c.out, "  提示: 主密码丢失后数据无法恢复，请定期 export 备份")
+	return nil
+}
+
 func (c *CLI) readSecret(prompt string) (string, error) {
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		fmt.Fprint(c.out, prompt)
@@ -383,7 +399,7 @@ func (c *CLI) readSecret(prompt string) (string, error) {
 
 func (c *CLI) printHelp() {
 	fmt.Fprintln(c.out, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  pwstore 密码管理器 (v`+Version+`)
+  pwstore 密码管理器 (v`+config.Version+`)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   直接运行（无参数）进入交互式 TUI
 
@@ -397,6 +413,7 @@ func (c *CLI) printHelp() {
     export [-o 文件]        导出明文备份
     passwd                 修改主密码
     destroy                自毁（删除所有数据）
+    about                  查看版本与加密信息
     version                显示版本
     help                   显示帮助
 

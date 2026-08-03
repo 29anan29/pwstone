@@ -1,6 +1,6 @@
 BINARY := pwstore
 VERSION ?= 1.0.0
-LDFLAGS := -ldflags "-X pwstore/internal/cli.Version=$(VERSION)"
+LDFLAGS := -ldflags "-X pwstore/internal/config.Version=$(VERSION)"
 
 .PHONY: build test vet fmt install clean
 

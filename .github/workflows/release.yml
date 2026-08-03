@@ -74,7 +74,7 @@ jobs:
           V=${{ steps.ver.outputs.value }}
           mkdir -p "dist/${{ matrix.os }}-${{ matrix.arch }}"
           go build -trimpath \
-            -ldflags "-s -w -X pwstore/internal/cli.Version=$V" \
+            -ldflags "-s -w -X pwstore/internal/config.Version=$V" \
             -o "dist/${{ matrix.os }}-${{ matrix.arch }}/pwstore${{ matrix.ext }}" \
             ./cmd/pwstore
 

@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"pwstore/internal/config"
 )
 
 type loginModel struct {
@@ -41,6 +43,7 @@ func (m Model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) loginView() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("🔐 pwstore 密码管理器"))
+	b.WriteString(dimStyle.Render("  v" + config.Version))
 	b.WriteString("\n\n")
 	b.WriteString(subStyle.Render("请输入主密码解锁（连续输错 5 次将锁定 30 秒）"))
 	b.WriteString("\n\n")
