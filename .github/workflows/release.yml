@@ -96,13 +96,15 @@ jobs:
         if: matrix.os == 'linux'
         run: |
           V=${{ steps.ver.outputs.value }}
+          DEBVER="$V"
+          [[ "$DEBVER" =~ ^[0-9] ]] || DEBVER="0${DEBVER}"
           cd dist
-          d="pwstore_${V}_${{ matrix.arch }}"
+          d="pwstore_${DEBVER}_${{ matrix.arch }}"
           mkdir -p "$d/DEBIAN" "$d/usr/local/bin"
           cp "${{ matrix.os }}-${{ matrix.arch }}/pwstore" "$d/usr/local/bin/"
           cat > "$d/DEBIAN/control" <<EOF
           Package: pwstore
-          Version: $V
+          Version: $DEBVER
           Section: utils
           Priority: optional
           Architecture: ${{ matrix.arch }}
