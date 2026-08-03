@@ -1,0 +1,146 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+      - name: vet
+        run: go vet ./...
+      - name: test
+        run: go test ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: .exe
+          - os: windows
+            arch: arm64
+            ext: .exe
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: version
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="dev-${GITHUB_SHA::7}"
+          fi
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+
+      - name: build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: "0"
+        run: |
+          V=${{ steps.ver.outputs.value }}
+          mkdir -p "dist/${{ matrix.os }}-${{ matrix.arch }}"
+          go build -trimpath \
+            -ldflags "-s -w -X pwstore/internal/cli.Version=$V" \
+            -o "dist/${{ matrix.os }}-${{ matrix.arch }}/pwstore${{ matrix.ext }}" \
+            ./cmd/pwstore
+
+      - name: package (zip)
+        if: matrix.os == 'windows'
+        run: |
+          V=${{ steps.ver.outputs.value }}
+          cd dist
+          zip -r "pwstore_${V}_${{ matrix.os }}_${{ matrix.arch }}.zip" "${{ matrix.os }}-${{ matrix.arch }}"
+
+      - name: package (tar.gz)
+        if: matrix.os != 'windows'
+        run: |
+          V=${{ steps.ver.outputs.value }}
+          cd dist
+          tar -czf "pwstore_${V}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" "${{ matrix.os }}-${{ matrix.arch }}"
+
+      - name: package (deb)
+        if: matrix.os == 'linux'
+        run: |
+          V=${{ steps.ver.outputs.value }}
+          cd dist
+          d="pwstore_${V}_${{ matrix.arch }}"
+          mkdir -p "$d/DEBIAN" "$d/usr/local/bin"
+          cp "${{ matrix.os }}-${{ matrix.arch }}/pwstore" "$d/usr/local/bin/"
+          cat > "$d/DEBIAN/control" <<EOF
+          Package: pwstore
+          Version: $V
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.arch }}
+          Maintainer: 29anan29 <19anon@users.noreply.github.com>
+          Description: Password manager with Argon2id + AES-256-GCM and TUI
+          EOF
+          dpkg-deb --build "$d"
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwstore-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.deb
+          if-no-files-found: ignore
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: checksums
+        run: |
+          cd artifacts
+          sha256sum *.zip *.tar.gz *.deb > SHA256SUMS
+          cat SHA256SUMS
+      - name: release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz
+            artifacts/**/*.deb
+            artifacts/SHA256SUMS
+          generate_release_notes: true

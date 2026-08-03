@@ -1,0 +1,5 @@
+bin/
+*.tmp
+.pwstore-*.tmp
+pwstore_export_*.txt
+pat
