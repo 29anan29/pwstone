@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,13 +11,17 @@ import (
 	"pwstore/internal/model"
 )
 
-var ErrWrongPassword = crypto.ErrWrongPassword
+var (
+	ErrWrongPassword = crypto.ErrWrongPassword
+	ErrBusy          = errors.New("store: vault is locked by another process")
+)
 
 type Vault struct {
 	path    string
 	key     []byte
 	params  crypto.Params
 	entries []model.Entry
+	lk      *os.File
 }
 
 func Exists(path string) bool {
@@ -37,10 +42,20 @@ func Create(path, password string) (*Vault, error) {
 	if err := v.Save(); err != nil {
 		return nil, err
 	}
+	if err := hardenPerms(path); err != nil {
+		return nil, err
+	}
+	v.lk, err = acquireLock(path)
+	if err != nil {
+		return nil, err
+	}
 	return v, nil
 }
 
 func Open(path, password string) (*Vault, error) {
+	if err := hardenPerms(path); err != nil {
+		return nil, err
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -53,7 +68,11 @@ func Open(path, password string) (*Vault, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Vault{path: path, key: key, params: params, entries: entries}, nil
+	lk, err := acquireLock(path)
+	if err != nil {
+		return nil, err
+	}
+	return &Vault{path: path, key: key, params: params, entries: entries, lk: lk}, nil
 }
 
 func (v *Vault) Path() string { return v.path }
@@ -152,10 +171,38 @@ func (v *Vault) Export(path string) error {
 }
 
 func (v *Vault) Close() {
+	if v.lk != nil {
+		unlockFile(v.lk)
+		v.lk.Close()
+		v.lk = nil
+	}
 	for i := range v.key {
 		v.key[i] = 0
 	}
 	v.key = nil
+}
+
+func acquireLock(path string) (*os.File, error) {
+	f, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := lockFile(f); err != nil {
+		f.Close()
+		return nil, ErrBusy
+	}
+	return f, nil
+}
+
+func hardenPerms(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return os.Chmod(path, 0o600)
+	}
+	return nil
 }
 
 func (v *Vault) Save() error {

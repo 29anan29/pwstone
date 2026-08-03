@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"pwstore/internal/config"
 	"pwstore/internal/model"
 )
 
@@ -100,9 +101,9 @@ func (m Model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(shown) > 0 {
 				e := shown[lm.cursor]
 				if err := clipboard.WriteAll(e.Password); err != nil {
-					lm.status = "❌ 复制失败: " + err.Error()
+					lm.status = "✗ 复制失败: " + err.Error()
 				} else {
-					lm.status = "✅ 已复制密码: " + e.Site
+					lm.status = "✓ 已复制密码: " + e.Site
 				}
 			}
 		case "a":
@@ -140,52 +141,64 @@ func (m Model) listView() string {
 	shown := lm.shown(m.entries)
 	lm.clamp(len(shown))
 
+	widths := []int{5, 20, 16, 14, 12}
+	headers := []string{"#", "网站", "账号", "密码", "备注"}
+	if m.width < 90 {
+		widths = []int{4, 18, 14, 12}
+		headers = []string{"#", "网站", "账号", "密码"}
+	}
+
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("🔐 pwstore"))
-	b.WriteString(dimStyle.Render("  共 " + fmt.Sprint(len(m.entries)) + " 条 · 显示 " + fmt.Sprint(len(shown)) + " 条"))
+	b.WriteString(titleStyle.Render("pw"))
+	b.WriteString(dimStyle.Render("  v" + config.Version + " · 共 " + fmt.Sprint(len(m.entries)) + " 条 · 显示 " + fmt.Sprint(len(shown)) + " 条"))
 	b.WriteString("\n\n")
 
-	header := headStyle.Render(pad("#", 4) + pad("网站", 26) + pad("账号", 22) + pad("密码", 28) + pad("备注", 20))
-	b.WriteString(header)
-	b.WriteString("\n")
-
-	visible := max(8, m.height-14)
-	pageStart := (lm.cursor / visible) * visible
-	pageEnd := min(pageStart+visible, len(shown))
-
 	if len(shown) == 0 {
-		b.WriteString("\n")
-		b.WriteString(dimStyle.Render("  📭 暂无记录 — 按 a 添加，/ 搜索"))
-		b.WriteString("\n")
+		b.WriteString(boxStyle.Render(dimStyle.Render("- 暂无记录 — 按 a 添加，/ 搜索")))
+		b.WriteString("\n\n")
 	} else {
+		b.WriteString(headStyle.Render(tableSep("╭", "┬", "╮", widths)))
+		b.WriteString("\n")
+		b.WriteString(headStyle.Render(tableRow(headers, widths)))
+		b.WriteString("\n")
+		b.WriteString(headStyle.Render(tableSep("├", "┼", "┤", widths)))
+		b.WriteString("\n")
+
+		visible := max(6, m.height-12)
+		pageStart := (lm.cursor / visible) * visible
+		pageEnd := min(pageStart+visible, len(shown))
 		for i := pageStart; i < pageEnd; i++ {
 			e := shown[i]
 			pw := e.Password
 			if !lm.revealed[i] {
 				pw = strings.Repeat("*", min(len([]rune(pw)), 12))
 			}
-			line := pad(fmt.Sprint(i+1), 4) + pad(trunc(e.Site, 24), 26) + pad(trunc(e.Username, 20), 22) + pad(trunc(pw, 26), 28) + pad(trunc(e.Notes, 18), 20)
-			if i == lm.cursor {
-				b.WriteString(selStyle.Render(pad(line, m.width-2)))
-			} else {
-				b.WriteString(line)
+			cells := []string{fmt.Sprint(i + 1), e.Site, e.Username, pw}
+			if len(headers) == 5 {
+				cells = append(cells, e.Notes)
 			}
+			row := tableRow(cells, widths)
+			if i == lm.cursor {
+				row = selStyle.Render(row)
+			}
+			b.WriteString(row)
 			b.WriteString("\n")
 		}
+		b.WriteString(headStyle.Render(tableSep("╰", "┴", "╯", widths)))
+		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
 	if lm.filtering {
-		b.WriteString(lipgloss.NewStyle().Foreground(accent).Render("🔍 ") + lm.filter.View())
+		b.WriteString(lipgloss.NewStyle().Foreground(accent).Render("搜索> ") + lm.filter.View())
 	} else {
-		b.WriteString(dimStyle.Render("🔍 " + lm.filter.Placeholder))
+		b.WriteString(dimStyle.Render("搜索: / · 选择: ↑↓ j k · 显示密码: 空格 · 复制: c"))
 	}
 	b.WriteString("\n")
 
 	if lm.status != "" {
-		b.WriteString(okStyle.Render("  " + lm.status))
+		b.WriteString(lm.status)
 	} else {
-		b.WriteString(dimStyle.Render("  ↑↓ 选择 · / 搜索 · 空格 显示密码 · c 复制 · a 添加 · e 编辑 · d 删除 · x 导出 · l 锁定 · q 退出"))
+		b.WriteString(dimStyle.Render("新增: a · 编辑: e · 删除: d · 导出: x · 锁定: l · 退出: q"))
 	}
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top,

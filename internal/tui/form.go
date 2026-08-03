@@ -95,9 +95,9 @@ func (m Model) saveForm() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if created {
-		return m, func() tea.Msg { return formSavedMsg{status: "✅ 已添加: " + e.Site} }
+		return m, func() tea.Msg { return formSavedMsg{status: "✓ 已添加: " + e.Site} }
 	}
-	return m, func() tea.Msg { return formSavedMsg{status: "✅ 已更新: " + e.Site} }
+	return m, func() tea.Msg { return formSavedMsg{status: "✓ 已更新: " + e.Site} }
 }
 
 func (m Model) formView() string {
@@ -106,7 +106,7 @@ func (m Model) formView() string {
 	if m.form.editing {
 		title = "编辑记录"
 	}
-	b.WriteString(titleStyle.Render("📝 " + title))
+	b.WriteString(titleStyle.Render("| " + title))
 	b.WriteString("\n\n")
 	for i, t := range m.form.inputs {
 		b.WriteString(t.View())
@@ -114,7 +114,7 @@ func (m Model) formView() string {
 		_ = i
 	}
 	if m.form.err != "" {
-		b.WriteString(errStyle.Render("❌ " + m.form.err))
+		b.WriteString(errStyle.Render("✗ " + m.form.err))
 		b.WriteString("\n\n")
 	}
 	if m.form.focus == 2 {
@@ -128,7 +128,7 @@ func (m Model) formView() string {
 
 func (m Model) confirmView() string {
 	var b strings.Builder
-	b.WriteString(errStyle.Render("⚠️ " + m.confirm.msg))
+	b.WriteString(errStyle.Render("! " + m.confirm.msg))
 	b.WriteString("\n\n")
 	b.WriteString(subStyle.Render("  y 确认删除 · n / Esc 取消"))
 	content := boxStyle.Render(b.String())

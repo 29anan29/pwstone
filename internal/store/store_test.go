@@ -137,3 +137,24 @@ func TestFilePermissions(t *testing.T) {
 		t.Fatalf("expected 0600, got %o", perm)
 	}
 }
+
+func TestExclusiveLock(t *testing.T) {
+	path := tempVault(t)
+	v, _ := Create(path, "m@ster-123456")
+	defer v.Close()
+	if _, err := acquireLock(path); err != ErrBusy {
+		t.Fatalf("expected ErrBusy while lock held, got %v", err)
+	}
+}
+
+func TestLockReleasedOnClose(t *testing.T) {
+	path := tempVault(t)
+	v, _ := Create(path, "m@ster-123456")
+	v.Close()
+	lk, err := acquireLock(path)
+	if err != nil {
+		t.Fatalf("lock should be reacquirable after close: %v", err)
+	}
+	unlockFile(lk)
+	lk.Close()
+}

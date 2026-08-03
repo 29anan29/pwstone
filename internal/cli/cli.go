@@ -55,7 +55,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "destroy":
 		return c.dispatch(c.cmdDestroy(args[1:]))
 	case "version", "-v", "--version":
-		fmt.Fprintf(c.out, "pwstore %s\n", config.Version)
+		fmt.Fprintf(c.out, "pw %s\n", config.Version)
 		return 0
 	case "about":
 		return c.dispatch(c.cmdAbout(args[1:]))
@@ -73,7 +73,7 @@ func (c *CLI) dispatch(err error) int {
 	if err == nil {
 		return 0
 	}
-	fmt.Fprintln(c.err, "❌ "+err.Error())
+	fmt.Fprintln(c.err, "✗ "+err.Error())
 	if errors.Is(err, auth.ErrLocked) || errors.Is(err, store.ErrWrongPassword) {
 		return 3
 	}
@@ -94,7 +94,7 @@ func (c *CLI) runTUI() int {
 
 func (c *CLI) cmdInit(args []string) error {
 	if len(args) != 0 {
-		return fmt.Errorf("用法: pwstore init（init 不接受额外参数）")
+		return fmt.Errorf("用法: pw init（init 不接受额外参数）")
 	}
 	if store.Exists(config.VaultPath()) {
 		return errors.New("数据已存在，如需重置请先 destroy")
@@ -107,7 +107,7 @@ func (c *CLI) cmdInit(args []string) error {
 			return err
 		}
 		if ok, msg := model.CheckMasterStrength(master); !ok {
-			fmt.Fprintln(c.out, "❌ "+msg)
+			fmt.Fprintln(c.out, "✗ "+msg)
 			continue
 		}
 		master2, err := c.readSecret("再次确认主密码: ")
@@ -115,13 +115,13 @@ func (c *CLI) cmdInit(args []string) error {
 			return err
 		}
 		if master != master2 {
-			fmt.Fprintln(c.out, "❌ 两次输入不一致")
+			fmt.Fprintln(c.out, "✗ 两次输入不一致")
 			continue
 		}
 		if _, err := store.Create(config.VaultPath(), master); err != nil {
 			return err
 		}
-		fmt.Fprintln(c.out, "✅ 主密码已设置")
+		fmt.Fprintln(c.out, "✓ 主密码已设置")
 		return nil
 	}
 }
@@ -143,7 +143,7 @@ func (c *CLI) unlockLoop() (*store.Vault, error) {
 		if errors.Is(err, auth.ErrLocked) {
 			return nil, err
 		}
-		fmt.Fprintln(c.out, "❌ "+err.Error())
+		fmt.Fprintln(c.out, "✗ "+err.Error())
 	}
 }
 
@@ -153,14 +153,14 @@ func (c *CLI) cmdIn(args []string) error {
 		return err
 	}
 	if len(pos) < 1 {
-		return errors.New("用法: pwstore in <网站> [-u 账号] [-n 备注]")
+		return errors.New("用法: pw in <网站> [-u 账号] [-n 备注]")
 	}
 	site := pos[0]
 	user := flags["user"]
 	note := flags["note"]
 
 	if !store.Exists(config.VaultPath()) {
-		return errors.New("尚未初始化，请先运行: pwstore init")
+		return errors.New("尚未初始化，请先运行: pw init")
 	}
 	v, err := c.unlockLoop()
 	if err != nil {
@@ -177,9 +177,9 @@ func (c *CLI) cmdIn(args []string) error {
 		return err
 	}
 	if created {
-		fmt.Fprintf(c.out, "✅ 已添加: %s / %s\n", site, user)
+		fmt.Fprintf(c.out, "✓ 已添加: %s / %s\n", site, user)
 	} else {
-		fmt.Fprintf(c.out, "✅ 已更新: %s / %s\n", site, user)
+		fmt.Fprintf(c.out, "✓ 已更新: %s / %s\n", site, user)
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func (c *CLI) cmdOut(args []string) error {
 		return err
 	}
 	if len(pos) < 1 {
-		return errors.New("用法: pwstore out <网站> [-u 账号]")
+		return errors.New("用法: pw out <网站> [-u 账号]")
 	}
 	v, err := c.unlockLoop()
 	if err != nil {
@@ -199,7 +199,7 @@ func (c *CLI) cmdOut(args []string) error {
 	defer v.Close()
 	e, ok := v.Get(pos[0], flags["user"])
 	if !ok {
-		return fmt.Errorf("❌ 未找到: %s / %s", pos[0], flags["user"])
+		return fmt.Errorf("✗ 未找到: %s / %s", pos[0], flags["user"])
 	}
 	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintf(c.out, "  网站: %s\n", e.Site)
@@ -214,7 +214,7 @@ func (c *CLI) cmdOut(args []string) error {
 
 func (c *CLI) cmdSearch(args []string) error {
 	if len(args) == 0 {
-		return errors.New("用法: pwstore search <关键字>")
+		return errors.New("用法: pw search <关键字>")
 	}
 	v, err := c.unlockLoop()
 	if err != nil {
@@ -223,7 +223,7 @@ func (c *CLI) cmdSearch(args []string) error {
 	defer v.Close()
 	results := v.Search(strings.Join(args, " "))
 	if len(results) == 0 {
-		fmt.Fprintf(c.out, "❌ 未找到匹配: %s\n", strings.Join(args, " "))
+		fmt.Fprintf(c.out, "✗ 未找到匹配: %s\n", strings.Join(args, " "))
 		return nil
 	}
 	for i, e := range results {
@@ -248,7 +248,7 @@ func (c *CLI) cmdList(args []string) error {
 	defer v.Close()
 	entries := v.Entries()
 	if len(entries) == 0 {
-		fmt.Fprintln(c.out, "📭 暂无保存的记录")
+		fmt.Fprintln(c.out, "-  暂无保存的记录")
 		return nil
 	}
 	for i, e := range entries {
@@ -264,7 +264,7 @@ func (c *CLI) cmdDel(args []string) error {
 		return err
 	}
 	if len(pos) < 1 {
-		return errors.New("用法: pwstore del <网站> [-u 账号]")
+		return errors.New("用法: pw del <网站> [-u 账号]")
 	}
 	v, err := c.unlockLoop()
 	if err != nil {
@@ -272,9 +272,9 @@ func (c *CLI) cmdDel(args []string) error {
 	}
 	defer v.Close()
 	if !v.Delete(pos[0], flags["user"]) {
-		return fmt.Errorf("❌ 未找到: %s / %s", pos[0], flags["user"])
+		return fmt.Errorf("✗ 未找到: %s / %s", pos[0], flags["user"])
 	}
-	fmt.Fprintf(c.out, "✅ 已删除: %s / %s\n", pos[0], flags["user"])
+	fmt.Fprintf(c.out, "✓ 已删除: %s / %s\n", pos[0], flags["user"])
 	return nil
 }
 
@@ -289,17 +289,17 @@ func (c *CLI) cmdExport(args []string) error {
 	}
 	defer v.Close()
 	if len(v.Entries()) == 0 {
-		fmt.Fprintln(c.out, "📭 无数据可导出")
+		fmt.Fprintln(c.out, "-  无数据可导出")
 		return nil
 	}
 	path := flags["output"]
 	if path == "" {
-		path = filepath.Join(".", "pwstore_export_"+time.Now().Format("20060102_150405")+".txt")
+		path = filepath.Join(".", "pw_export_"+time.Now().Format("20060102_150405")+".txt")
 	}
 	if err := v.Export(path); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.out, "✅ 已导出到: %s\n", path)
+	fmt.Fprintf(c.out, "✓ 已导出到: %s\n", path)
 	return nil
 }
 
@@ -315,7 +315,7 @@ func (c *CLI) cmdPasswd(args []string) error {
 			return err
 		}
 		if ok, msg := model.CheckMasterStrength(np); !ok {
-			fmt.Fprintln(c.out, "❌ "+msg)
+			fmt.Fprintln(c.out, "✗ "+msg)
 			continue
 		}
 		np2, err := c.readSecret("再次确认新主密码: ")
@@ -323,19 +323,19 @@ func (c *CLI) cmdPasswd(args []string) error {
 			return err
 		}
 		if np != np2 {
-			fmt.Fprintln(c.out, "❌ 两次输入不一致")
+			fmt.Fprintln(c.out, "✗ 两次输入不一致")
 			continue
 		}
 		if err := v.Rekey(np); err != nil {
 			return err
 		}
-		fmt.Fprintln(c.out, "✅ 主密码已更新（所有数据已用新密钥重新加密）")
+		fmt.Fprintln(c.out, "✓ 主密码已更新（所有数据已用新密钥重新加密）")
 		return nil
 	}
 }
 
 func (c *CLI) cmdDestroy(args []string) error {
-	fmt.Fprint(c.out, "⚠️  自毁将删除所有数据（不可恢复），确认输入 DESTROY: ")
+	fmt.Fprint(c.out, "! 自毁将删除所有数据（不可恢复），确认输入 DESTROY: ")
 	var confirm string
 	if term.IsTerminal(int(os.Stdin.Fd())) {
 		_, _ = fmt.Scanln(&confirm)
@@ -358,13 +358,13 @@ func (c *CLI) cmdDestroy(args []string) error {
 		}
 	}
 	_ = os.Remove(config.AppDir())
-	fmt.Fprintf(c.out, "💥 自毁完成，已清除 %d 个文件\n", removed)
+	fmt.Fprintf(c.out, "自毁完成，已清除 %d 个文件\n", removed)
 	return nil
 }
 
 func (c *CLI) cmdAbout(args []string) error {
 	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Fprintln(c.out, "  pwstore 密码管理器 v"+config.Version)
+	fmt.Fprintln(c.out, "  pw 密码管理器 v"+config.Version)
 	fmt.Fprintln(c.out, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Fprintln(c.out, "  加密引擎: Argon2id (64 MiB, iter=3, 4 线程) + AES-256-GCM")
 	fmt.Fprintln(c.out, "  数据存储: "+config.AppDir())
@@ -399,7 +399,7 @@ func (c *CLI) readSecret(prompt string) (string, error) {
 
 func (c *CLI) printHelp() {
 	fmt.Fprintln(c.out, `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  pwstore 密码管理器 (v`+config.Version+`)
+  pw 密码管理器 (v`+config.Version+`)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   直接运行（无参数）进入交互式 TUI
 
@@ -422,6 +422,7 @@ func (c *CLI) printHelp() {
     • AES-256-GCM 逐记录加密（网站/账号/密码全加密）
     • 主密码永不落盘、不出现在命令行参数
     • 连续输错 5 次锁定 30 秒（持久化，跨进程生效）
+    • 文件互斥锁，防止多进程同时写坏数据
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
 }
 

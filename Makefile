@@ -1,4 +1,4 @@
-BINARY := pwstore
+BINARY := pw
 VERSION ?= 1.0.0
 LDFLAGS := -ldflags "-X pwstore/internal/config.Version=$(VERSION)"
 

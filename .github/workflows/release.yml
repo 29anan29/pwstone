@@ -75,7 +75,7 @@ jobs:
           mkdir -p "dist/${{ matrix.os }}-${{ matrix.arch }}"
           go build -trimpath \
             -ldflags "-s -w -X pwstore/internal/config.Version=$V" \
-            -o "dist/${{ matrix.os }}-${{ matrix.arch }}/pwstore${{ matrix.ext }}" \
+            -o "dist/${{ matrix.os }}-${{ matrix.arch }}/pw${{ matrix.ext }}" \
             ./cmd/pwstore
 
       - name: package (zip)
@@ -83,14 +83,14 @@ jobs:
         run: |
           V=${{ steps.ver.outputs.value }}
           cd dist
-          zip -r "pwstore_${V}_${{ matrix.os }}_${{ matrix.arch }}.zip" "${{ matrix.os }}-${{ matrix.arch }}"
+          zip -r "pw_${V}_${{ matrix.os }}_${{ matrix.arch }}.zip" "${{ matrix.os }}-${{ matrix.arch }}"
 
       - name: package (tar.gz)
         if: matrix.os != 'windows'
         run: |
           V=${{ steps.ver.outputs.value }}
           cd dist
-          tar -czf "pwstore_${V}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" "${{ matrix.os }}-${{ matrix.arch }}"
+          tar -czf "pw_${V}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" "${{ matrix.os }}-${{ matrix.arch }}"
 
       - name: package (deb)
         if: matrix.os == 'linux'
@@ -99,11 +99,11 @@ jobs:
           DEBVER="$V"
           [[ "$DEBVER" =~ ^[0-9] ]] || DEBVER="0${DEBVER}"
           cd dist
-          d="pwstore_${DEBVER}_${{ matrix.arch }}"
+          d="pw_${DEBVER}_${{ matrix.arch }}"
           mkdir -p "$d/DEBIAN" "$d/usr/local/bin"
-          cp "${{ matrix.os }}-${{ matrix.arch }}/pwstore" "$d/usr/local/bin/"
+          cp "${{ matrix.os }}-${{ matrix.arch }}/pw" "$d/usr/local/bin/"
           cat > "$d/DEBIAN/control" <<EOF
-          Package: pwstore
+          Package: pw
           Version: $DEBVER
           Section: utils
           Priority: optional
@@ -116,7 +116,7 @@ jobs:
       - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pwstore-${{ matrix.os }}-${{ matrix.arch }}
+          name: pw-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             dist/*.zip
             dist/*.tar.gz

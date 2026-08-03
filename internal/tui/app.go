@@ -84,7 +84,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e := m.entries[m.confirm.index]
 		m.vault.Delete(e.Site, e.Username)
 		m.entries = m.vault.Entries()
-		m.list.status = "✅ 已删除: " + e.Site
+		m.list.status = "✓ 已删除: " + e.Site
 		m.state = stList
 		return m, nil
 	case confirmNoMsg:
@@ -101,9 +101,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case exportDoneMsg:
 		msg := msg.(exportDoneMsg)
 		if msg.err != nil {
-			m.list.status = "❌ 导出失败: " + msg.err.Error()
+			m.list.status = "✗ 导出失败: " + msg.err.Error()
 		} else {
-			m.list.status = "✅ 已导出: " + msg.path
+			m.list.status = "✓ 已导出: " + msg.path
 		}
 		return m, nil
 	case statusMsg:

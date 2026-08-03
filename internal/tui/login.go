@@ -41,19 +41,20 @@ func (m Model) updateLogin(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) loginView() string {
+	banner := bannerStyle.Render(bannerArt)
+	banner += "\n" + titleStyle.Render("pw 密码管理器") + dimStyle.Render("  v"+config.Version)
+	banner += "\n" + subStyle.Render("Argon2id + AES-256-GCM · 连续输错 5 次锁定 30 秒")
+
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("🔐 pwstore 密码管理器"))
-	b.WriteString(dimStyle.Render("  v" + config.Version))
-	b.WriteString("\n\n")
-	b.WriteString(subStyle.Render("请输入主密码解锁（连续输错 5 次将锁定 30 秒）"))
+	b.WriteString(subStyle.Render("请输入主密码解锁"))
 	b.WriteString("\n\n")
 	b.WriteString(m.login.input.View())
 	b.WriteString("\n\n")
 	if m.login.err != "" {
-		b.WriteString(errStyle.Render("❌ " + m.login.err))
+		b.WriteString(errStyle.Render("! " + m.login.err))
 	} else {
-		b.WriteString(subStyle.Render("Esc/Ctrl+C 退出"))
+		b.WriteString(subStyle.Render("Ctrl+C 退出"))
 	}
-	content := boxStyle.Render(b.String())
+	content := banner + "\n\n" + boxStyle.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 }
